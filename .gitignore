@@ -27,7 +27,7 @@ secrets.json
 credentials.json
 
 # ── Node / frontend ───────────────────────────────────────────────────────────
-frontend/node_modules/
+node_modules/
 frontend/dist/
 frontend/.vite/
 
