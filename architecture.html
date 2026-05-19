@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>AI Mail Generator — Architecture</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;min-height:100vh}
+body{
+  font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,sans-serif;
+  background:#0a0a1a;
+  color:#eeeeff;
+  padding:52px 56px 90px;
+}
+
+.header{text-align:center;margin-bottom:56px}
+.header h1{
+  font-size:2.2rem;font-weight:800;letter-spacing:-0.025em;
+  background:linear-gradient(135deg,#818cf8,#c084fc);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  margin-bottom:8px;
+}
+.header p{color:#555580;font-size:0.8rem;letter-spacing:0.1em;text-transform:uppercase}
+
+.canvas{
+  background:#0d0d22;
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:16px;
+  padding:40px 44px;
+  margin-bottom:44px;
+}
+.canvas-label{
+  font-size:0.68rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;
+  color:#3a3a70;margin-bottom:32px;
+}
+
+/* ══════════════════════════════════
+   UPLOAD FLOW
+══════════════════════════════════ */
+.upload-pipe{
+  display:grid;grid-template-columns:repeat(5,1fr);
+  align-items:stretch;position:relative;
+}
+.upload-pipe::before{
+  content:'';position:absolute;
+  left:10%;right:10%;top:50%;height:2px;
+  background:linear-gradient(90deg,#6366f1,#a855f7);opacity:0.25;z-index:0;
+}
+.u-col{position:relative;z-index:1;padding:0 6px;display:flex;align-items:center;justify-content:center}
+.u-col:not(:last-child)::after{
+  content:'▶';position:absolute;right:-10px;top:50%;transform:translateY(-50%);
+  font-size:0.75rem;color:rgba(99,102,241,0.55);z-index:3;
+}
+.u-node{
+  width:100%;background:#13132e;
+  border:1.5px solid rgba(99,102,241,0.28);border-radius:10px;
+  padding:22px 14px;text-align:center;
+  display:flex;flex-direction:column;align-items:center;
+}
+.u-step{
+  width:22px;height:22px;border-radius:50%;
+  background:rgba(99,102,241,0.2);border:1px solid rgba(99,102,241,0.55);
+  color:#a5b4fc;font-size:0.65rem;font-weight:800;
+  display:flex;align-items:center;justify-content:center;margin-bottom:12px;
+}
+.u-icon{font-size:1.8rem;margin-bottom:10px;line-height:1}
+.u-name{font-size:0.78rem;font-weight:700;color:#a5b4fc;margin-bottom:6px;line-height:1.3}
+.u-hint{font-size:0.68rem;color:#555580;line-height:1.45}
+
+/* ══════════════════════════════════
+   GENERATE FLOW — proper arch diagram
+══════════════════════════════════ */
+.arch-diagram{
+  display:flex;flex-direction:column;align-items:center;gap:0;width:100%;
+}
+
+/* ── vertical arrow ── */
+.v-arrow{
+  display:flex;flex-direction:column;align-items:center;
+  flex-shrink:0;
+}
+.v-arrow .v-line{width:2px;height:28px;background:rgba(255,255,255,0.12)}
+.v-arrow .v-tip{
+  width:0;height:0;
+  border-left:6px solid transparent;
+  border-right:6px solid transparent;
+  border-top:9px solid rgba(255,255,255,0.18);
+}
+.v-arrow.col-ind .v-line{background:rgba(99,102,241,0.4)}
+.v-arrow.col-ind .v-tip{border-top-color:rgba(99,102,241,0.4)}
+.v-arrow.col-amb .v-line{background:rgba(245,158,11,0.4)}
+.v-arrow.col-amb .v-tip{border-top-color:rgba(245,158,11,0.4)}
+.v-arrow.col-blu .v-line{background:rgba(59,130,246,0.4)}
+.v-arrow.col-blu .v-tip{border-top-color:rgba(59,130,246,0.4)}
+.v-arrow.col-grn .v-line{background:rgba(16,185,129,0.4)}
+.v-arrow.col-grn .v-tip{border-top-color:rgba(16,185,129,0.4)}
+.v-arrow.col-vio .v-line{background:rgba(139,92,246,0.4)}
+.v-arrow.col-vio .v-tip{border-top-color:rgba(139,92,246,0.4)}
+.v-arrow.col-pnk .v-line{background:rgba(236,72,153,0.4)}
+.v-arrow.col-pnk .v-tip{border-top-color:rgba(236,72,153,0.4)}
+
+/* ── process node (rectangle) ── */
+.proc{
+  width:100%;max-width:560px;
+  border-radius:10px;border:1.5px solid;
+  padding:16px 22px;
+  position:relative;
+}
+.proc-head{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.proc-icon{font-size:1.2rem;flex-shrink:0}
+.proc-title{font-size:0.88rem;font-weight:700;line-height:1.3}
+.proc-desc{font-size:0.74rem;color:#6868a8;line-height:1.55}
+
+/* ── start / end pill ── */
+.terminal{
+  padding:10px 32px;border-radius:30px;
+  font-size:0.82rem;font-weight:700;letter-spacing:0.04em;
+  border:2px solid;text-align:center;
+}
+
+/* ── parallel group (web sources / AI steps) ── */
+.parallel-wrap{width:100%;max-width:860px}
+.parallel-label{
+  text-align:center;font-size:0.68rem;font-weight:700;
+  letter-spacing:0.08em;text-transform:uppercase;
+  margin-bottom:14px;
+}
+.parallel-row{display:grid;gap:12px;align-items:stretch}
+.parallel-row.cols-4{grid-template-columns:repeat(4,1fr)}
+.parallel-row.cols-3{grid-template-columns:repeat(3,1fr)}
+
+.par-node{
+  border-radius:10px;border:1.5px solid;
+  padding:14px 14px;text-align:center;
+}
+.par-icon{font-size:1.4rem;margin-bottom:8px;line-height:1;display:block}
+.par-name{font-size:0.76rem;font-weight:700;margin-bottom:4px;line-height:1.3}
+.par-hint{font-size:0.67rem;color:#555580;line-height:1.4}
+
+/* ── wide proc (full width) ── */
+.proc-wide{width:100%;max-width:860px}
+
+/* ── decision diamond ── */
+.diamond-wrap{display:flex;flex-direction:column;align-items:center}
+.diamond{
+  width:160px;height:80px;
+  position:relative;
+  display:flex;align-items:center;justify-content:center;
+}
+.diamond::before{
+  content:'';
+  position:absolute;inset:0;
+  background:rgba(236,72,153,0.1);
+  border:1.5px solid rgba(236,72,153,0.45);
+  transform:rotate(0deg);
+  clip-path:polygon(50% 0%,100% 50%,50% 100%,0% 50%);
+}
+.diamond-text{
+  position:relative;z-index:1;
+  font-size:0.72rem;font-weight:700;color:#f9a8d4;
+  text-align:center;line-height:1.3;
+}
+
+/* ── fork below diamond ── */
+.fork-row{
+  display:flex;align-items:flex-start;justify-content:center;
+  gap:0;width:100%;max-width:860px;margin-top:0;
+}
+.fork-branch-col{
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  gap:0;
+}
+.fork-h-line{height:2px;width:100%}
+.fork-v-down{width:2px;height:24px}
+.fork-tip{
+  width:0;height:0;
+  border-left:6px solid transparent;
+  border-right:6px solid transparent;
+}
+.fork-label{
+  font-size:0.66rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;
+  margin-bottom:10px;
+}
+.fork-card{
+  width:90%;border-radius:10px;border:1.5px solid;
+  padding:14px 16px;text-align:center;
+}
+.fork-card-title{font-size:0.8rem;font-weight:700;margin-bottom:5px}
+.fork-card-desc{font-size:0.69rem;color:#6868a8;line-height:1.5}
+
+/* ── pills ── */
+.pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;justify-content:center}
+.pill{padding:3px 10px;border-radius:5px;border:1px solid;font-size:0.64rem;font-weight:700}
+
+/* colours */
+.bg-ind{background:rgba(99,102,241,0.08);border-color:rgba(99,102,241,0.3)}
+.c-ind{color:#a5b4fc}
+.pill-ind{background:rgba(99,102,241,0.12);border-color:rgba(99,102,241,0.3);color:#a5b4fc}
+.t-ind{background:rgba(99,102,241,0.15);border-color:rgba(99,102,241,0.5);color:#a5b4fc}
+
+.bg-amb{background:rgba(245,158,11,0.07);border-color:rgba(245,158,11,0.28)}
+.c-amb{color:#fbbf24}
+.pill-amb{background:rgba(245,158,11,0.1);border-color:rgba(245,158,11,0.3);color:#fbbf24}
+
+.bg-blu{background:rgba(59,130,246,0.07);border-color:rgba(59,130,246,0.28)}
+.c-blu{color:#60a5fa}
+.pill-blu{background:rgba(59,130,246,0.1);border-color:rgba(59,130,246,0.3);color:#60a5fa}
+
+.bg-grn{background:rgba(16,185,129,0.07);border-color:rgba(16,185,129,0.25)}
+.c-grn{color:#34d399}
+.pill-grn{background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.28);color:#34d399}
+
+.bg-vio{background:rgba(139,92,246,0.07);border-color:rgba(139,92,246,0.28)}
+.c-vio{color:#c084fc}
+.pill-vio{background:rgba(139,92,246,0.1);border-color:rgba(139,92,246,0.3);color:#c084fc}
+
+.bg-pnk{background:rgba(236,72,153,0.07);border-color:rgba(236,72,153,0.28)}
+.c-pnk{color:#f9a8d4}
+.pill-pnk{background:rgba(236,72,153,0.1);border-color:rgba(236,72,153,0.3);color:#f9a8d4}
+
+.bg-mut{background:rgba(74,74,128,0.07);border-color:rgba(74,74,128,0.25);color:#8888c0}
+
+/* legend */
+.legend{
+  display:flex;flex-wrap:wrap;gap:16px;justify-content:center;
+  padding-top:24px;margin-top:32px;
+  border-top:1px solid rgba(255,255,255,0.05);
+}
+.leg{display:flex;align-items:center;gap:7px;font-size:0.72rem;color:#6868a8}
+.leg-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>AI Mail Generator</h1>
+  <p>System Architecture · End-to-End Flow</p>
+</div>
+
+<!-- ═══════════════════════════
+     CANVAS 1 — UPLOAD
+═══════════════════════════ -->
+<div class="canvas">
+  <div class="canvas-label">① Upload Flow — file → parsed leads → UI cards</div>
+
+  <div class="upload-pipe">
+    <div class="u-col">
+      <div class="u-node">
+        <div class="u-step">1</div>
+        <div class="u-icon">📁</div>
+        <div class="u-name">File Received</div>
+        <div class="u-hint">FastAPI<br>POST /api/upload</div>
+      </div>
+    </div>
+    <div class="u-col">
+      <div class="u-node">
+        <div class="u-step">2</div>
+        <div class="u-icon">🐼</div>
+        <div class="u-name">Parse with pandas</div>
+        <div class="u-hint">name · company · email<br>designation · industry</div>
+      </div>
+    </div>
+    <div class="u-col">
+      <div class="u-node">
+        <div class="u-step">3</div>
+        <div class="u-icon">🏷️</div>
+        <div class="u-name">Classify Role</div>
+        <div class="u-hint">C-Suite · VP · Manager<br>Technical · HR · Sales</div>
+      </div>
+    </div>
+    <div class="u-col">
+      <div class="u-node">
+        <div class="u-step">4</div>
+        <div class="u-icon">💾</div>
+        <div class="u-name">Save to SQLite</div>
+        <div class="u-hint">UUID per lead<br>Status → Pending</div>
+      </div>
+    </div>
+    <div class="u-col">
+      <div class="u-node">
+        <div class="u-step">5</div>
+        <div class="u-icon">🃏</div>
+        <div class="u-name">Cards Appear</div>
+        <div class="u-hint">SSE event →<br>UI renders cards</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="leg"><div class="leg-dot" style="background:#6366f1"></div>React Frontend</div>
+    <div class="leg"><div class="leg-dot" style="background:#7c3aed"></div>FastAPI Backend</div>
+    <div class="leg"><div class="leg-dot" style="background:#3b82f6"></div>SQLite</div>
+    <div class="leg"><div class="leg-dot" style="background:#10b981"></div>SSE Real-time</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════
+     CANVAS 2 — GENERATE
+═══════════════════════════ -->
+<div class="canvas">
+  <div class="canvas-label">② Generate Flow — per lead, on Start Processing</div>
+
+  <div class="arch-diagram">
+
+    <!-- START -->
+    <div class="terminal t-ind">▶️ User clicks Start Processing</div>
+
+    <div class="v-arrow col-ind"><div class="v-line"></div><div class="v-tip"></div></div>
+
+    <!-- STEP 1: Thread -->
+    <div class="proc bg-ind">
+      <div class="proc-head">
+        <span class="proc-icon">🔄</span>
+        <span class="proc-title c-ind">Background Thread Spawned</span>
+      </div>
+      <div class="proc-desc">FastAPI spawns a daemon thread per batch. Server remains responsive. Card status → <strong>Processing…</strong> broadcast via SSE.</div>
+    </div>
+
+    <div class="v-arrow col-amb"><div class="v-line"></div><div class="v-tip"></div></div>
+
+    <!-- STEP 2: Web Research (parallel 4) -->
+    <div class="parallel-wrap">
+      <div class="parallel-label c-amb">🌐 Web Research — 4 sources in parallel</div>
+      <div class="parallel-row cols-4">
+        <div class="par-node bg-amb">
+          <span class="par-icon">🔍</span>
+          <div class="par-name c-amb">Serper</div>
+          <div class="par-hint">Google search results, site pages, hiring signals</div>
+        </div>
+        <div class="par-node bg-amb">
+          <span class="par-icon">🤖</span>
+          <div class="par-name c-amb">Tavily AI</div>
+          <div class="par-hint">AI-curated news and company snippets</div>
+        </div>
+        <div class="par-node bg-amb">
+          <span class="par-icon">📄</span>
+          <div class="par-name c-amb">Jina AI</div>
+          <div class="par-hint">Reads actual website page content as clean text</div>
+        </div>
+        <div class="par-node bg-amb">
+          <span class="par-icon">📚</span>
+          <div class="par-name c-amb">Wikipedia</div>
+          <div class="par-hint">Company background, founding, industry context</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="v-arrow col-blu"><div class="v-line"></div><div class="v-tip"></div></div>
+
+    <!-- STEP 3: RAG -->
+    <div class="proc bg-blu">
+      <div class="proc-head">
+        <span class="proc-icon">🔍</span>
+        <span class="proc-title c-blu">RAG — ChromaDB Knowledge Retrieval</span>
+      </div>
+      <div class="proc-desc">Semantic search across two vector collections using BAAI/bge embeddings. Returns industry pain points and matched solutions as context for the LLM.</div>
+      <div class="pills">
+        <div class="pill pill-blu">Industry pain points KB</div>
+        <div class="pill pill-blu">Solutions library</div>
+        <div class="pill pill-blu">bge-large-en embeddings</div>
+      </div>
+    </div>
+
+    <div class="v-arrow col-grn"><div class="v-line"></div><div class="v-tip"></div></div>
+
+    <!-- STEP 4: AI Analysis (parallel 3) -->
+    <div class="parallel-wrap">
+      <div class="parallel-label c-grn">🧠 AI Analysis — LangGraph · Meta-Llama 3.1 · 3 sequential LLM calls</div>
+      <div class="parallel-row cols-3">
+        <div class="par-node bg-grn">
+          <span class="par-icon">① 🏢</span>
+          <div class="par-name c-grn">Business Analysis</div>
+          <div class="par-hint">Company profile, digital maturity, growth stage, competitive position</div>
+        </div>
+        <div class="par-node bg-grn">
+          <span class="par-icon">② 😣</span>
+          <div class="par-name c-grn">Pain Point Extraction</div>
+          <div class="par-hint">Scored JSON list of operational and strategic pain areas</div>
+        </div>
+        <div class="par-node bg-grn">
+          <span class="par-icon">③ 💡</span>
+          <div class="par-name c-grn">Opportunity Mapping</div>
+          <div class="par-hint">Solutions matched to pain points with urgency ratings</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="v-arrow col-vio"><div class="v-line"></div><div class="v-tip"></div></div>
+
+    <!-- STEP 5: Email Generation -->
+    <div class="proc bg-vio">
+      <div class="proc-head">
+        <span class="proc-icon">✍️</span>
+        <span class="proc-title c-vio">Role-Aware Email Generation</span>
+      </div>
+      <div class="proc-desc">Prompt engineered for the recipient's seniority. LLM writes subject line + full email body using all gathered research and analysis.</div>
+      <div class="pills">
+        <div class="pill pill-vio">👔 C-Suite → ROI &amp; strategy</div>
+        <div class="pill pill-vio">💻 Technical → integration</div>
+        <div class="pill pill-vio">👥 HR → people outcomes</div>
+        <div class="pill pill-vio">📈 Sales → pipeline impact</div>
+      </div>
+    </div>
+
+    <div class="v-arrow col-amb"><div class="v-line"></div><div class="v-tip"></div></div>
+
+    <!-- STEP 6: QA Judge -->
+    <div class="proc bg-amb">
+      <div class="proc-head">
+        <span class="proc-icon">⚖️</span>
+        <span class="proc-title c-amb">LLM Quality Judge</span>
+      </div>
+      <div class="proc-desc">Second LLM call scores the email on personalisation, specificity, and tone. If score is below threshold → auto-rewrite and re-score. Only emails that pass QA proceed.</div>
+    </div>
+
+    <div class="v-arrow col-pnk"><div class="v-line"></div><div class="v-tip"></div></div>
+
+    <!-- STEP 7: Decision diamond -->
+    <div class="diamond-wrap">
+      <div class="diamond">
+        <div class="diamond-text">SMTP<br>configured?</div>
+      </div>
+    </div>
+
+    <!-- Fork branches -->
+    <div class="fork-row" style="max-width:700px;width:100%">
+
+      <!-- YES branch (left) -->
+      <div class="fork-branch-col">
+        <div class="fork-h-line" style="background:rgba(16,185,129,0.4);margin-right:-1px"></div>
+        <div style="display:flex;flex-direction:column;align-items:center">
+          <div class="fork-v-down" style="background:rgba(16,185,129,0.4)"></div>
+          <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:9px solid rgba(16,185,129,0.45)"></div>
+        </div>
+        <div class="fork-label c-grn">YES</div>
+        <div class="fork-card bg-grn">
+          <div class="fork-card-title c-grn">📬 Email Sent</div>
+          <div class="fork-card-desc">Gmail SMTP · STARTTLS · subject parsed from content · delivery confirmed</div>
+        </div>
+      </div>
+
+      <!-- NO branch (right) -->
+      <div class="fork-branch-col">
+        <div class="fork-h-line" style="background:rgba(74,74,128,0.4);margin-left:-1px"></div>
+        <div style="display:flex;flex-direction:column;align-items:center">
+          <div class="fork-v-down" style="background:rgba(74,74,128,0.4)"></div>
+          <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:9px solid rgba(74,74,128,0.4)"></div>
+        </div>
+        <div class="fork-label" style="color:#8888c0">NO</div>
+        <div class="fork-card bg-mut">
+          <div class="fork-card-title" style="color:#8888c0">💾 Saved Only</div>
+          <div class="fork-card-desc">Email saved · viewable &amp; downloadable from card</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="v-arrow col-grn"><div class="v-line"></div><div class="v-tip"></div></div>
+
+    <!-- STEP 8: SSE update -->
+    <div class="proc bg-grn">
+      <div class="proc-head">
+        <span class="proc-icon">⚡</span>
+        <span class="proc-title c-grn">SSE card_update Event → Real-time UI</span>
+      </div>
+      <div class="proc-desc">Backend pushes event over live SSE connection. Card in the dashboard flips instantly.</div>
+      <div class="pills">
+        <div class="pill pill-grn">Done badge</div>
+        <div class="pill pill-grn">Sent badge</div>
+        <div class="pill pill-grn">Email Content active</div>
+        <div class="pill pill-grn">Copy / Download</div>
+      </div>
+    </div>
+
+    <div class="v-arrow col-grn"><div class="v-line"></div><div class="v-tip"></div></div>
+
+    <!-- END -->
+    <div class="terminal" style="background:rgba(16,185,129,0.12);border-color:rgba(16,185,129,0.5);color:#34d399">
+      ✅ Lead Processed
+    </div>
+
+  </div><!-- /arch-diagram -->
+
+  <div class="legend">
+    <div class="leg"><div class="leg-dot" style="background:#6366f1"></div>FastAPI / Threading</div>
+    <div class="leg"><div class="leg-dot" style="background:#f59e0b"></div>External APIs</div>
+    <div class="leg"><div class="leg-dot" style="background:#3b82f6"></div>ChromaDB / RAG</div>
+    <div class="leg"><div class="leg-dot" style="background:#10b981"></div>LangGraph / LLM</div>
+    <div class="leg"><div class="leg-dot" style="background:#8b5cf6"></div>Email Generation</div>
+    <div class="leg"><div class="leg-dot" style="background:#ec4899"></div>SMTP Decision</div>
+    <div class="leg"><div class="leg-dot" style="background:#10b981"></div>SSE Real-time</div>
+  </div>
+
+</div>
+
+</body>
+</html>
