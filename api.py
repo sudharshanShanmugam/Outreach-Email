@@ -80,15 +80,13 @@ async def on_startup():
     global _main_loop
     _main_loop = asyncio.get_event_loop()
     _load_env()
-    from store import init_db, get_all_leads
+    from store import init_db, clear_all_leads
     from services.chroma_manager import clear_all_collections
     from services.kb_ingestion import seed_trident_kb
     init_db()
+    clear_all_leads()
     with _state_lock:
-        for lead in get_all_leads():
-            lid = lead["id"]
-            if lid not in _card_states:
-                _card_states[lid] = {"status": "pending", "email": None, "sent": False, "error": None}
+        _card_states.clear()
     clear_all_collections()
     seed_trident_kb()
 
@@ -131,6 +129,18 @@ async def get_leads():
     from store import get_all_leads
     leads = _enrich_leads(get_all_leads())
     return {"leads": leads, "card_states": dict(_card_states), "processing": _processing}
+
+
+@app.delete("/api/leads/{lead_id}")
+async def delete_lead(lead_id: str):
+    from store import delete_lead as _delete_lead
+    _delete_lead(lead_id)
+    with _state_lock:
+        _card_states.pop(lead_id, None)
+    from store import get_all_leads
+    leads = _enrich_leads(get_all_leads())
+    _broadcast_sync({"type": "leads_updated", "leads": leads, "card_states": dict(_card_states)})
+    return {"status": "deleted"}
 
 
 @app.delete("/api/leads")

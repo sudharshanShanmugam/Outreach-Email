@@ -5,13 +5,13 @@ import Paper from '@mui/material/Paper'
 import Stack from '@mui/material/Stack'
 import Typography from '@mui/material/Typography'
 import Button from '@mui/material/Button'
-import IconButton from '@mui/material/IconButton'
+
 import Tooltip from '@mui/material/Tooltip'
 import TextField from '@mui/material/TextField'
 import InputAdornment from '@mui/material/InputAdornment'
 import Chip from '@mui/material/Chip'
 import LinearProgress from '@mui/material/LinearProgress'
-import Alert from '@mui/material/Alert'
+
 import Divider from '@mui/material/Divider'
 import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
@@ -19,7 +19,7 @@ import AddRoundedIcon from '@mui/icons-material/AddRounded'
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded'
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
 import AutorenewRoundedIcon from '@mui/icons-material/AutorenewRounded'
-import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
+
 
 import { Lead, CardStates } from '../types'
 import LeadCard from './LeadCard'
@@ -30,18 +30,18 @@ interface Props {
   processing: boolean
   doneCount: number
   sentCount: number
-  smtpConfigured: boolean
   onStart: () => void
   onClear: () => void
   onUploadMore: (f: File) => Promise<unknown>
   onEmailClick: (id: string) => void
+  onRemoveLead: (id: string) => void
 }
 
 type FilterTab = 'all' | 'pending' | 'processing' | 'done' | 'sent' | 'error'
 
 export default function Dashboard({
   leads, cardStates, processing, doneCount, sentCount,
-  smtpConfigured, onStart, onClear, onUploadMore, onEmailClick,
+  onStart, onClear, onUploadMore, onEmailClick, onRemoveLead,
 }: Props) {
   const theme = useTheme()
   const isDark = theme.palette.mode === 'dark'
@@ -150,13 +150,18 @@ export default function Dashboard({
               </Button>
             </Tooltip>
 
-            <Tooltip title="Clear all leads">
-              <IconButton size="small" onClick={onClear} disabled={processing}
-                sx={{ border: '1px solid rgba(239,68,68,0.3)', color: 'error.main', borderRadius: '8px',
-                      '&:hover': { bgcolor: 'rgba(239,68,68,0.08)' } }}>
-                <DeleteOutlineIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
+            <Button
+              variant="outlined"
+              size="small"
+              color="error"
+              startIcon={<DeleteOutlineIcon />}
+              onClick={onClear}
+              disabled={processing}
+              sx={{ whiteSpace: 'nowrap', borderColor: 'rgba(239,68,68,0.4)',
+                    '&:hover': { bgcolor: 'rgba(239,68,68,0.08)', borderColor: 'error.main' } }}
+            >
+              Clear Leads
+            </Button>
           </Stack>
         </Stack>
 
@@ -171,12 +176,6 @@ export default function Dashboard({
         )}
       </Paper>
 
-      {/* SMTP warning */}
-      {!smtpConfigured && (
-        <Alert severity="warning" icon={<WarningAmberRoundedIcon />} sx={{ mb: 2 }}>
-          SMTP not configured — emails will be generated but not sent. Click ⚙ Settings in the top bar.
-        </Alert>
-      )}
 
       {/* ── Filter + Search row ── */}
       <Stack direction={{ xs: 'column', sm: 'row' }} gap={1.5} alignItems="center" mb={2.5}>
@@ -207,17 +206,43 @@ export default function Dashboard({
 
         {/* Search */}
         <TextField
-          placeholder="Search company, name, email…"
+          placeholder="Search by company, name or email…"
           value={search}
           onChange={e => setSearch(e.target.value)}
           size="small"
-          sx={{ minWidth: 260 }}
+          sx={{
+            minWidth: 280,
+            '& .MuiOutlinedInput-root': {
+              borderRadius: '10px',
+              fontSize: '0.85rem',
+              '& fieldset': { borderColor: 'divider' },
+              '&:hover fieldset': { borderColor: 'primary.main' },
+              '&.Mui-focused fieldset': { borderColor: 'primary.main' },
+            },
+            '& input::placeholder': {
+              color: 'text.disabled',
+              fontStyle: 'italic',
+              opacity: 1,
+            },
+          }}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
-                <SearchRoundedIcon sx={{ fontSize: 18, color: 'text.disabled' }} />
+                <SearchRoundedIcon sx={{ fontSize: 17, color: search ? 'primary.main' : 'text.disabled' }} />
               </InputAdornment>
             ),
+            endAdornment: search ? (
+              <InputAdornment position="end">
+                <Typography
+                  variant="caption"
+                  sx={{ color: 'text.disabled', cursor: 'pointer', userSelect: 'none',
+                        '&:hover': { color: 'error.main' } }}
+                  onClick={() => setSearch('')}
+                >
+                  ✕
+                </Typography>
+              </InputAdornment>
+            ) : null,
           }}
         />
       </Stack>
@@ -242,6 +267,7 @@ export default function Dashboard({
               lead={lead}
               state={cardStates[lead.id] ?? { status: 'pending', sent: false, error: null }}
               onEmailClick={() => onEmailClick(lead.id)}
+              onRemove={() => onRemoveLead(lead.id)}
             />
           ))}
         </Box>

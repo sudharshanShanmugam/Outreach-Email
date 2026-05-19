@@ -7,19 +7,16 @@ import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import Tooltip from '@mui/material/Tooltip'
 import IconButton from '@mui/material/IconButton'
-import Chip from '@mui/material/Chip'
-import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined'
+
 import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined'
-import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord'
 import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined'
 import LightModeOutlinedIcon from '@mui/icons-material/LightModeOutlined'
 
 import { createAppTheme } from './theme'
-import { Lead, CardState, CardStates, SmtpStatus, SmtpSavePayload } from './types'
+import { Lead, CardState, CardStates } from './types'
 import UploadPage from './components/UploadPage'
 import Dashboard from './components/Dashboard'
 import EmailModal from './components/EmailModal'
-import Settings from './components/Settings'
 
 export default function App() {
   const [mode, setMode] = useState<PaletteMode>(
@@ -38,11 +35,9 @@ export default function App() {
   const [leads, setLeads] = useState<Lead[]>([])
   const [cardStates, setCardStates] = useState<CardStates>({})
   const [processing, setProcessing] = useState(false)
-  const [smtp, setSmtp] = useState<SmtpStatus>({
-    configured: false, user: '', host: 'smtp.gmail.com', port: 587, from_name: '',
-  })
+
   const [emailModal, setEmailModal] = useState<string | null>(null)
-  const [settingsOpen, setSettingsOpen] = useState(false)
+
   const sseRef = useRef<EventSource | null>(null)
 
   // ── SSE with auto-reconnect ─────────────────────────────────────────────
@@ -100,9 +95,6 @@ export default function App() {
     return () => sseRef.current?.close()
   }, [connectSSE])
 
-  useEffect(() => {
-    fetch('/api/smtp/status').then(r => r.json()).then(setSmtp).catch(() => {})
-  }, [])
 
   // ── Handlers ───────────────────────────────────────────────────────────
   const handleUpload = useCallback(async (file: File) => {
@@ -139,16 +131,10 @@ export default function App() {
     await fetch('/api/leads', { method: 'DELETE' })
   }, [])
 
-  const handleSmtpSave = useCallback(async (config: SmtpSavePayload) => {
-    const res = await fetch('/api/smtp/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(config),
-    })
-    const data = await res.json()
-    setSmtp(prev => ({ ...prev, ...config, ...data } as SmtpStatus))
-    return data
+  const handleRemoveLead = useCallback(async (id: string) => {
+    await fetch(`/api/leads/${id}`, { method: 'DELETE' })
   }, [])
+
 
   const doneCount = Object.values(cardStates).filter(s => s.status === 'done' || s.status === 'error').length
   const sentCount = Object.values(cardStates).filter(s => s.sent).length
@@ -168,13 +154,6 @@ export default function App() {
 
           <Box sx={{ flexGrow: 1 }} />
 
-          {hasLeads && (
-            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-              <Chip label={`${leads.length} leads`}    size="small" variant="outlined" sx={{ borderColor: 'divider',              color: 'text.secondary', fontSize: '0.73rem' }} />
-              <Chip label={`${doneCount} processed`}   size="small" variant="outlined" sx={{ borderColor: 'rgba(59,130,246,0.35)', color: 'info.main',    fontSize: '0.73rem' }} />
-              <Chip label={`${sentCount} sent`}         size="small" variant="outlined" sx={{ borderColor: 'rgba(16,185,129,0.35)', color: 'success.main', fontSize: '0.73rem' }} />
-            </Box>
-          )}
 
           <Tooltip title={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
             <IconButton onClick={toggleMode} size="small"
@@ -186,14 +165,6 @@ export default function App() {
             </IconButton>
           </Tooltip>
 
-          <Tooltip title={smtp.configured ? `SMTP: ${smtp.user}` : 'SMTP not configured'}>
-            <IconButton onClick={() => setSettingsOpen(true)} size="small"
-              sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '8px', px: 1.2,
-                    color: 'text.secondary', '&:hover': { borderColor: 'primary.main', color: 'primary.main' } }}>
-              <FiberManualRecordIcon sx={{ fontSize: 8, mr: 0.6, color: smtp.configured ? 'success.main' : 'text.disabled' }} />
-              <SettingsOutlinedIcon sx={{ fontSize: 17 }} />
-            </IconButton>
-          </Tooltip>
         </Toolbar>
       </AppBar>
 
@@ -208,11 +179,12 @@ export default function App() {
             processing={processing}
             doneCount={doneCount}
             sentCount={sentCount}
-            smtpConfigured={smtp.configured}
+
             onStart={handleStart}
             onClear={handleClear}
             onUploadMore={handleUpload}
             onEmailClick={setEmailModal}
+            onRemoveLead={handleRemoveLead}
           />
         )}
       </Box>
@@ -225,12 +197,6 @@ export default function App() {
         />
       )}
 
-      <Settings
-        open={settingsOpen}
-        smtp={smtp}
-        onSave={handleSmtpSave}
-        onClose={() => setSettingsOpen(false)}
-      />
     </ThemeProvider>
   )
 }

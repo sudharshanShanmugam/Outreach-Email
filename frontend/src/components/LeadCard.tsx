@@ -14,6 +14,8 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined'
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked'
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
+import IconButton from '@mui/material/IconButton'
 import { Lead, CardState, RoleTier } from '../types'
 
 // ── Role pill config ──────────────────────────────────────────────────────────
@@ -79,9 +81,10 @@ interface Props {
   lead: Lead
   state: CardState
   onEmailClick: () => void
+  onRemove: () => void
 }
 
-export default function LeadCard({ lead, state, onEmailClick }: Props) {
+export default function LeadCard({ lead, state, onEmailClick, onRemove }: Props) {
   const theme = useTheme()
   const isDark = theme.palette.mode === 'dark'
   const { status, sent, error } = state
@@ -117,7 +120,7 @@ export default function LeadCard({ lead, state, onEmailClick }: Props) {
       }}
     >
       <CardContent>
-        {/* Header: avatar + company + role pill */}
+        {/* Header: avatar + company + role pill + remove */}
         <Stack direction="row" alignItems="flex-start" gap={1.5} mb={1.2}>
           <Avatar sx={{ width: 38, height: 38, bgcolor: avatarBg, fontSize: '1rem', fontWeight: 800, flexShrink: 0 }}>
             {initial}
@@ -148,6 +151,21 @@ export default function LeadCard({ lead, state, onEmailClick }: Props) {
               </Typography>
             )}
           </Box>
+          <Tooltip title="Remove lead" placement="top">
+            <IconButton
+              size="small"
+              onClick={onRemove}
+              disabled={status === 'processing'}
+              sx={{
+                width: 24, height: 24, flexShrink: 0,
+                color: 'text.disabled',
+                '&:hover': { color: 'error.main', bgcolor: 'rgba(239,68,68,0.08)' },
+                '&.Mui-disabled': { opacity: 0.3 },
+              }}
+            >
+              <CloseRoundedIcon sx={{ fontSize: 15 }} />
+            </IconButton>
+          </Tooltip>
         </Stack>
 
         {/* Email address */}
