@@ -6,12 +6,13 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).parent.parent
 
-DEEPINFRA_API_KEY = os.getenv("DEEPINFRA_API_KEY", "80tQ18Dnwa9lb5eWExGQRoSUnotrQ1Km")
+DEEPINFRA_API_KEY  = os.getenv("DEEPINFRA_API_KEY", "")
 DEEPINFRA_BASE_URL = os.getenv("DEEPINFRA_BASE_URL", "https://api.deepinfra.com/v1/openai")
-LLM_MODEL = os.getenv("LLM_MODEL", "deepseek-ai/DeepSeek-V4-Flash")
-EMBED_MODEL = os.getenv("EMBED_MODEL", "BAAI/bge-large-en-v1.5")
-SERPER_API_KEY = os.getenv("SERPER_API_KEY", "")
-TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
+LLM_MODEL          = os.getenv("LLM_MODEL",          "deepseek-ai/DeepSeek-V4-Flash")
+FALLBACK_LLM_MODEL = os.getenv("FALLBACK_LLM_MODEL", "meta-llama/Meta-Llama-3.1-8B-Instruct")
+EMBED_MODEL        = os.getenv("EMBED_MODEL",         "BAAI/bge-large-en-v1.5")
+SERPER_API_KEY     = os.getenv("SERPER_API_KEY",      "")
+TAVILY_API_KEY     = os.getenv("TAVILY_API_KEY",      "")
 
 
 COLLECTIONS = {

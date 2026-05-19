@@ -1,496 +1,770 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>AI Mail Generator — Architecture</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-html,body{width:100%;min-height:100vh}
-body{
-  font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,sans-serif;
-  background:#0a0a1a;
-  color:#eeeeff;
-  padding:52px 56px 90px;
-}
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-.header{text-align:center;margin-bottom:56px}
-.header h1{
-  font-size:2.2rem;font-weight:800;letter-spacing:-0.025em;
-  background:linear-gradient(135deg,#818cf8,#c084fc);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
-  margin-bottom:8px;
-}
-.header p{color:#555580;font-size:0.8rem;letter-spacing:0.1em;text-transform:uppercase}
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #f1f5f9;
+    color: #1e293b;
+    min-height: 100vh;
+    padding: 40px 24px;
+  }
 
-.canvas{
-  background:#0d0d22;
-  border:1px solid rgba(255,255,255,0.06);
-  border-radius:16px;
-  padding:40px 44px;
-  margin-bottom:44px;
-}
-.canvas-label{
-  font-size:0.68rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;
-  color:#3a3a70;margin-bottom:32px;
-}
+  /* ── Page header ── */
+  .page-header {
+    text-align: center;
+    margin-bottom: 56px;
+  }
+  .page-header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    background: linear-gradient(135deg, #4f46e5, #6366f1, #7c3aed);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+  }
+  .page-header p {
+    color: #64748b;
+    font-size: 0.95rem;
+  }
 
-/* ══════════════════════════════════
-   UPLOAD FLOW
-══════════════════════════════════ */
-.upload-pipe{
-  display:grid;grid-template-columns:repeat(5,1fr);
-  align-items:stretch;position:relative;
-}
-.upload-pipe::before{
-  content:'';position:absolute;
-  left:10%;right:10%;top:50%;height:2px;
-  background:linear-gradient(90deg,#6366f1,#a855f7);opacity:0.25;z-index:0;
-}
-.u-col{position:relative;z-index:1;padding:0 6px;display:flex;align-items:center;justify-content:center}
-.u-col:not(:last-child)::after{
-  content:'▶';position:absolute;right:-10px;top:50%;transform:translateY(-50%);
-  font-size:0.75rem;color:rgba(99,102,241,0.55);z-index:3;
-}
-.u-node{
-  width:100%;background:#13132e;
-  border:1.5px solid rgba(99,102,241,0.28);border-radius:10px;
-  padding:22px 14px;text-align:center;
-  display:flex;flex-direction:column;align-items:center;
-}
-.u-step{
-  width:22px;height:22px;border-radius:50%;
-  background:rgba(99,102,241,0.2);border:1px solid rgba(99,102,241,0.55);
-  color:#a5b4fc;font-size:0.65rem;font-weight:800;
-  display:flex;align-items:center;justify-content:center;margin-bottom:12px;
-}
-.u-icon{font-size:1.8rem;margin-bottom:10px;line-height:1}
-.u-name{font-size:0.78rem;font-weight:700;color:#a5b4fc;margin-bottom:6px;line-height:1.3}
-.u-hint{font-size:0.68rem;color:#555580;line-height:1.45}
+  /* ── Section labels ── */
+  .section { margin-bottom: 64px; }
+  .section-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 24px;
+    padding-left: 4px;
+  }
+  .section-label::before {
+    content: '';
+    display: block;
+    width: 4px;
+    height: 16px;
+    border-radius: 2px;
+    background: var(--accent, #6366f1);
+  }
 
-/* ══════════════════════════════════
-   GENERATE FLOW — proper arch diagram
-══════════════════════════════════ */
-.arch-diagram{
-  display:flex;flex-direction:column;align-items:center;gap:0;width:100%;
-}
+  /* ── Cards ── */
+  .card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 20px 22px;
+    position: relative;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .card-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent, #6366f1);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-title svg { flex-shrink: 0; }
+  .item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 0.84rem;
+    color: #334155;
+  }
+  .item:last-child { border-bottom: none; }
+  .item-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .item-text strong { display: block; font-size: 0.83rem; color: #1e293b; }
+  .item-text span  { font-size: 0.76rem; color: #94a3b8; margin-top: 1px; display: block; }
 
-/* ── vertical arrow ── */
-.v-arrow{
-  display:flex;flex-direction:column;align-items:center;
-  flex-shrink:0;
-}
-.v-arrow .v-line{width:2px;height:28px;background:rgba(255,255,255,0.12)}
-.v-arrow .v-tip{
-  width:0;height:0;
-  border-left:6px solid transparent;
-  border-right:6px solid transparent;
-  border-top:9px solid rgba(255,255,255,0.18);
-}
-.v-arrow.col-ind .v-line{background:rgba(99,102,241,0.4)}
-.v-arrow.col-ind .v-tip{border-top-color:rgba(99,102,241,0.4)}
-.v-arrow.col-amb .v-line{background:rgba(245,158,11,0.4)}
-.v-arrow.col-amb .v-tip{border-top-color:rgba(245,158,11,0.4)}
-.v-arrow.col-blu .v-line{background:rgba(59,130,246,0.4)}
-.v-arrow.col-blu .v-tip{border-top-color:rgba(59,130,246,0.4)}
-.v-arrow.col-grn .v-line{background:rgba(16,185,129,0.4)}
-.v-arrow.col-grn .v-tip{border-top-color:rgba(16,185,129,0.4)}
-.v-arrow.col-vio .v-line{background:rgba(139,92,246,0.4)}
-.v-arrow.col-vio .v-tip{border-top-color:rgba(139,92,246,0.4)}
-.v-arrow.col-pnk .v-line{background:rgba(236,72,153,0.4)}
-.v-arrow.col-pnk .v-tip{border-top-color:rgba(236,72,153,0.4)}
+  /* ── Arrow ── */
+  .arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    font-size: 1.4rem;
+    flex-shrink: 0;
+  }
+  .arrow-label {
+    font-size: 0.68rem;
+    color: #94a3b8;
+    text-align: center;
+    margin-top: 2px;
+  }
 
-/* ── process node (rectangle) ── */
-.proc{
-  width:100%;max-width:560px;
-  border-radius:10px;border:1.5px solid;
-  padding:16px 22px;
-  position:relative;
-}
-.proc-head{display:flex;align-items:center;gap:10px;margin-bottom:6px}
-.proc-icon{font-size:1.2rem;flex-shrink:0}
-.proc-title{font-size:0.88rem;font-weight:700;line-height:1.3}
-.proc-desc{font-size:0.74rem;color:#6868a8;line-height:1.55}
+  /* ════════════════════════════════════════
+     SYSTEM OVERVIEW — top-level 3 columns
+  ════════════════════════════════════════ */
+  .overview-grid {
+    display: grid;
+    grid-template-columns: 1fr 48px 1fr 48px 1fr;
+    align-items: start;
+    gap: 0;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+  .overview-arrow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding-top: 60px;
+  }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    margin-top: 4px;
+  }
 
-/* ── start / end pill ── */
-.terminal{
-  padding:10px 32px;border-radius:30px;
-  font-size:0.82rem;font-weight:700;letter-spacing:0.04em;
-  border:2px solid;text-align:center;
-}
+  /* ════════════════════════════════════════
+     UPLOAD FLOW
+  ════════════════════════════════════════ */
+  .flow-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+  .flow-node {
+    flex: 1;
+    min-width: 140px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px 14px;
+    text-align: center;
+    position: relative;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  .flow-node-num {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    font-size: 0.7rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 10px;
+  }
+  .flow-node-icon { font-size: 1.5rem; margin-bottom: 8px; }
+  .flow-node-name { font-size: 0.82rem; font-weight: 600; color: #1e293b; margin-bottom: 4px; }
+  .flow-node-desc { font-size: 0.72rem; color: #64748b; line-height: 1.4; }
+  .flow-arrow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 6px;
+    flex-shrink: 0;
+  }
+  .flow-arrow-line {
+    width: 32px;
+    height: 2px;
+    background: linear-gradient(90deg, #e2e8f0, #cbd5e1);
+    position: relative;
+  }
+  .flow-arrow-line::after {
+    content: '▶';
+    position: absolute;
+    right: -8px;
+    top: -7px;
+    font-size: 9px;
+    color: #94a3b8;
+  }
 
-/* ── parallel group (web sources / AI steps) ── */
-.parallel-wrap{width:100%;max-width:860px}
-.parallel-label{
-  text-align:center;font-size:0.68rem;font-weight:700;
-  letter-spacing:0.08em;text-transform:uppercase;
-  margin-bottom:14px;
-}
-.parallel-row{display:grid;gap:12px;align-items:stretch}
-.parallel-row.cols-4{grid-template-columns:repeat(4,1fr)}
-.parallel-row.cols-3{grid-template-columns:repeat(3,1fr)}
+  /* ════════════════════════════════════════
+     AI PIPELINE (Generate flow)
+  ════════════════════════════════════════ */
+  .pipeline-wrap {
+    max-width: 960px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    align-items: center;
+  }
+  .pipe-step {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .pipe-box {
+    width: 100%;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  .pipe-box-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+  .pipe-box-body { flex: 1; }
+  .pipe-box-name { font-size: 0.88rem; font-weight: 600; color: #1e293b; }
+  .pipe-box-desc { font-size: 0.76rem; color: #64748b; margin-top: 2px; }
+  .pipe-box-tags { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .tag {
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    border: 1px solid;
+  }
+  .pipe-down {
+    width: 2px;
+    height: 28px;
+    background: linear-gradient(180deg, #e2e8f0, #cbd5e1);
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .pipe-down::after {
+    content: '▼';
+    font-size: 8px;
+    color: #94a3b8;
+    margin-bottom: -2px;
+  }
 
-.par-node{
-  border-radius:10px;border:1.5px solid;
-  padding:14px 14px;text-align:center;
-}
-.par-icon{font-size:1.4rem;margin-bottom:8px;line-height:1;display:block}
-.par-name{font-size:0.76rem;font-weight:700;margin-bottom:4px;line-height:1.3}
-.par-hint{font-size:0.67rem;color:#555580;line-height:1.4}
+  /* parallel grid inside pipeline */
+  .parallel-grid {
+    display: grid;
+    gap: 10px;
+    width: 100%;
+  }
+  .parallel-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+  .parallel-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .parallel-grid.cols-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
 
-/* ── wide proc (full width) ── */
-.proc-wide{width:100%;max-width:860px}
+  .parallel-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #94a3b8;
+    text-align: center;
+    margin-bottom: 6px;
+    width: 100%;
+  }
 
-/* ── decision diamond ── */
-.diamond-wrap{display:flex;flex-direction:column;align-items:center}
-.diamond{
-  width:160px;height:80px;
-  position:relative;
-  display:flex;align-items:center;justify-content:center;
-}
-.diamond::before{
-  content:'';
-  position:absolute;inset:0;
-  background:rgba(236,72,153,0.1);
-  border:1.5px solid rgba(236,72,153,0.45);
-  transform:rotate(0deg);
-  clip-path:polygon(50% 0%,100% 50%,50% 100%,0% 50%);
-}
-.diamond-text{
-  position:relative;z-index:1;
-  font-size:0.72rem;font-weight:700;color:#f9a8d4;
-  text-align:center;line-height:1.3;
-}
+  .p-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .p-card-icon { font-size: 1.1rem; margin-bottom: 6px; }
+  .p-card-name { font-size: 0.78rem; font-weight: 600; color: #1e293b; }
+  .p-card-desc { font-size: 0.7rem; color: #64748b; margin-top: 2px; line-height: 1.35; }
 
-/* ── fork below diamond ── */
-.fork-row{
-  display:flex;align-items:flex-start;justify-content:center;
-  gap:0;width:100%;max-width:860px;margin-top:0;
-}
-.fork-branch-col{
-  flex:1;display:flex;flex-direction:column;align-items:center;
-  gap:0;
-}
-.fork-h-line{height:2px;width:100%}
-.fork-v-down{width:2px;height:24px}
-.fork-tip{
-  width:0;height:0;
-  border-left:6px solid transparent;
-  border-right:6px solid transparent;
-}
-.fork-label{
-  font-size:0.66rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;
-  margin-bottom:10px;
-}
-.fork-card{
-  width:90%;border-radius:10px;border:1.5px solid;
-  padding:14px 16px;text-align:center;
-}
-.fork-card-title{font-size:0.8rem;font-weight:700;margin-bottom:5px}
-.fork-card-desc{font-size:0.69rem;color:#6868a8;line-height:1.5}
+  /* decision diamond */
+  .diamond-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    width: 100%;
+  }
+  .diamond {
+    width: 90px;
+    height: 90px;
+    background: #fffbeb;
+    border: 2px solid #f59e0b60;
+    transform: rotate(45deg);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .diamond-inner {
+    transform: rotate(-45deg);
+    text-align: center;
+  }
+  .diamond-inner .di { font-size: 1.1rem; }
+  .diamond-inner .dl { font-size: 0.65rem; font-weight: 700; color: #f59e0b; margin-top: 2px; }
 
-/* ── pills ── */
-.pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;justify-content:center}
-.pill{padding:3px 10px;border-radius:5px;border:1px solid;font-size:0.64rem;font-weight:700}
+  .diamond-branch {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 0 16px;
+  }
+  .branch-yes {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 0.78rem;
+  }
+  .branch-no {
+    background: #fff5f5;
+    border: 1px solid #fecaca;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 0.78rem;
+  }
+  .branch-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 3px;
+  }
 
-/* colours */
-.bg-ind{background:rgba(99,102,241,0.08);border-color:rgba(99,102,241,0.3)}
-.c-ind{color:#a5b4fc}
-.pill-ind{background:rgba(99,102,241,0.12);border-color:rgba(99,102,241,0.3);color:#a5b4fc}
-.t-ind{background:rgba(99,102,241,0.15);border-color:rgba(99,102,241,0.5);color:#a5b4fc}
+  /* ── Tech stack legend ── */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 0.78rem;
+    color: #475569;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+  .legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
 
-.bg-amb{background:rgba(245,158,11,0.07);border-color:rgba(245,158,11,0.28)}
-.c-amb{color:#fbbf24}
-.pill-amb{background:rgba(245,158,11,0.1);border-color:rgba(245,158,11,0.3);color:#fbbf24}
+  /* colours */
+  .c-indigo { --accent: #6366f1; }
+  .c-violet  { --accent: #8b5cf6; }
+  .c-sky     { --accent: #38bdf8; }
+  .c-emerald { --accent: #10b981; }
+  .c-amber   { --accent: #f59e0b; }
+  .c-rose    { --accent: #f43f5e; }
 
-.bg-blu{background:rgba(59,130,246,0.07);border-color:rgba(59,130,246,0.28)}
-.c-blu{color:#60a5fa}
-.pill-blu{background:rgba(59,130,246,0.1);border-color:rgba(59,130,246,0.3);color:#60a5fa}
+  .bg-indigo  { background: #eef2ff; color: #4f46e5; }
+  .bg-violet  { background: #f5f3ff; color: #7c3aed; }
+  .bg-sky     { background: #e0f2fe; color: #0284c7; }
+  .bg-emerald { background: #ecfdf5; color: #059669; }
+  .bg-amber   { background: #fffbeb; color: #d97706; }
+  .bg-rose    { background: #fff1f2; color: #e11d48; }
+  .bg-slate   { background: #f1f5f9; color: #64748b; }
 
-.bg-grn{background:rgba(16,185,129,0.07);border-color:rgba(16,185,129,0.25)}
-.c-grn{color:#34d399}
-.pill-grn{background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.28);color:#34d399}
+  .border-indigo  { border-color: #c7d2fe !important; }
+  .border-violet  { border-color: #ddd6fe !important; }
+  .border-sky     { border-color: #bae6fd !important; }
+  .border-emerald { border-color: #a7f3d0 !important; }
+  .border-amber   { border-color: #fde68a !important; }
+  .border-rose    { border-color: #fecdd3 !important; }
 
-.bg-vio{background:rgba(139,92,246,0.07);border-color:rgba(139,92,246,0.28)}
-.c-vio{color:#c084fc}
-.pill-vio{background:rgba(139,92,246,0.1);border-color:rgba(139,92,246,0.3);color:#c084fc}
+  .tag-indigo  { color: #4f46e5; border-color: #c7d2fe; background: #eef2ff; }
+  .tag-sky     { color: #0284c7; border-color: #bae6fd; background: #e0f2fe; }
+  .tag-emerald { color: #059669; border-color: #a7f3d0; background: #ecfdf5; }
+  .tag-amber   { color: #d97706; border-color: #fde68a; background: #fffbeb; }
+  .tag-rose    { color: #e11d48; border-color: #fecdd3; background: #fff1f2; }
+  .tag-violet  { color: #7c3aed; border-color: #ddd6fe; background: #f5f3ff; }
 
-.bg-pnk{background:rgba(236,72,153,0.07);border-color:rgba(236,72,153,0.28)}
-.c-pnk{color:#f9a8d4}
-.pill-pnk{background:rgba(236,72,153,0.1);border-color:rgba(236,72,153,0.3);color:#f9a8d4}
-
-.bg-mut{background:rgba(74,74,128,0.07);border-color:rgba(74,74,128,0.25);color:#8888c0}
-
-/* legend */
-.legend{
-  display:flex;flex-wrap:wrap;gap:16px;justify-content:center;
-  padding-top:24px;margin-top:32px;
-  border-top:1px solid rgba(255,255,255,0.05);
-}
-.leg{display:flex;align-items:center;gap:7px;font-size:0.72rem;color:#6868a8}
-.leg-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+  @media (max-width: 680px) {
+    .overview-grid { grid-template-columns: 1fr; }
+    .overview-arrow { padding-top: 0; transform: rotate(90deg); margin: 8px auto; }
+    .parallel-grid.cols-3,
+    .parallel-grid.cols-4 { grid-template-columns: 1fr 1fr; }
+  }
 </style>
 </head>
 <body>
 
-<div class="header">
-  <h1>AI Mail Generator</h1>
-  <p>System Architecture · End-to-End Flow</p>
+<!-- ══════════════════════════════════════════════════════════
+     PAGE HEADER
+══════════════════════════════════════════════════════════ -->
+<div class="page-header">
+  <h1>AI Mail Generator — Architecture</h1>
+  <p>End-to-end system design: from lead upload to personalised email delivery</p>
 </div>
 
-<!-- ═══════════════════════════
-     CANVAS 1 — UPLOAD
-═══════════════════════════ -->
-<div class="canvas">
-  <div class="canvas-label">① Upload Flow — file → parsed leads → UI cards</div>
 
-  <div class="upload-pipe">
-    <div class="u-col">
-      <div class="u-node">
-        <div class="u-step">1</div>
-        <div class="u-icon">📁</div>
-        <div class="u-name">File Received</div>
-        <div class="u-hint">FastAPI<br>POST /api/upload</div>
-      </div>
-    </div>
-    <div class="u-col">
-      <div class="u-node">
-        <div class="u-step">2</div>
-        <div class="u-icon">🐼</div>
-        <div class="u-name">Parse with pandas</div>
-        <div class="u-hint">name · company · email<br>designation · industry</div>
-      </div>
-    </div>
-    <div class="u-col">
-      <div class="u-node">
-        <div class="u-step">3</div>
-        <div class="u-icon">🏷️</div>
-        <div class="u-name">Classify Role</div>
-        <div class="u-hint">C-Suite · VP · Manager<br>Technical · HR · Sales</div>
-      </div>
-    </div>
-    <div class="u-col">
-      <div class="u-node">
-        <div class="u-step">4</div>
-        <div class="u-icon">💾</div>
-        <div class="u-name">Save to SQLite</div>
-        <div class="u-hint">UUID per lead<br>Status → Pending</div>
-      </div>
-    </div>
-    <div class="u-col">
-      <div class="u-node">
-        <div class="u-step">5</div>
-        <div class="u-icon">🃏</div>
-        <div class="u-name">Cards Appear</div>
-        <div class="u-hint">SSE event →<br>UI renders cards</div>
-      </div>
-    </div>
-  </div>
+<!-- ══════════════════════════════════════════════════════════
+     1. SYSTEM OVERVIEW
+══════════════════════════════════════════════════════════ -->
+<div class="section c-indigo">
+  <div class="section-label">01 — System Overview</div>
 
-  <div class="legend">
-    <div class="leg"><div class="leg-dot" style="background:#6366f1"></div>React Frontend</div>
-    <div class="leg"><div class="leg-dot" style="background:#7c3aed"></div>FastAPI Backend</div>
-    <div class="leg"><div class="leg-dot" style="background:#3b82f6"></div>SQLite</div>
-    <div class="leg"><div class="leg-dot" style="background:#10b981"></div>SSE Real-time</div>
+  <div class="overview-grid">
+
+    <!-- CLIENT -->
+    <div class="card c-sky border-sky">
+      <div class="card-title">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        Browser / Client
+      </div>
+      <div class="item">
+        <div class="item-icon bg-sky">🖥</div>
+        <div class="item-text"><strong>Next.js 14</strong><span>React SPA · Static export</span></div>
+      </div>
+      <div class="item">
+        <div class="item-icon bg-slate">📁</div>
+        <div class="item-text"><strong>CSV / Excel Upload</strong><span>Drag & drop leads file</span></div>
+      </div>
+      <div class="item">
+        <div class="item-icon bg-slate">📡</div>
+        <div class="item-text"><strong>SSE Live Updates</strong><span>Real-time card status stream</span></div>
+      </div>
+      <div class="item">
+        <div class="item-icon bg-slate">🌙</div>
+        <div class="item-text"><strong>Dark / Light Mode</strong><span>Material UI v6 theming</span></div>
+      </div>
+    </div>
+
+    <!-- ARROW -->
+    <div class="overview-arrow">
+      <div class="arrow">⟷</div>
+      <div class="arrow-label">HTTP<br/>REST + SSE</div>
+    </div>
+
+    <!-- SERVER -->
+    <div class="card c-indigo border-indigo">
+      <div class="card-title">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="7" cy="6" r="1" fill="currentColor"/><circle cx="7" cy="18" r="1" fill="currentColor"/></svg>
+        FastAPI Backend
+      </div>
+      <div class="item">
+        <div class="item-icon bg-indigo">⚡</div>
+        <div class="item-text"><strong>FastAPI + Uvicorn</strong><span>Async Python · Port $PORT</span></div>
+      </div>
+      <div class="item">
+        <div class="item-icon bg-indigo">📤</div>
+        <div class="item-text"><strong>File Parser</strong><span>CSV · Excel · PDF · DOCX</span></div>
+      </div>
+      <div class="item">
+        <div class="item-icon bg-indigo">🧠</div>
+        <div class="item-text"><strong>AI Pipeline Runner</strong><span>LangGraph multi-agent graph</span></div>
+      </div>
+      <div class="item">
+        <div class="item-icon bg-indigo">💾</div>
+        <div class="item-text"><strong>In-Memory Store</strong><span>Leads · Analyses · Outreach</span></div>
+      </div>
+    </div>
+
+    <!-- ARROW -->
+    <div class="overview-arrow">
+      <div class="arrow">→</div>
+      <div class="arrow-label">API calls<br/>+ SMTP</div>
+    </div>
+
+    <!-- EXTERNAL -->
+    <div class="card c-violet border-violet">
+      <div class="card-title">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        External Services
+      </div>
+      <div class="item">
+        <div class="item-icon bg-violet">🤖</div>
+        <div class="item-text"><strong>DeepInfra LLM</strong><span>Meta-Llama 3.1 · 8B Instruct</span></div>
+      </div>
+      <div class="item">
+        <div class="item-icon bg-violet">🔢</div>
+        <div class="item-text"><strong>BGE Embeddings</strong><span>BAAI/bge-large-en-v1.5</span></div>
+      </div>
+      <div class="item">
+        <div class="item-icon bg-amber">🔍</div>
+        <div class="item-text"><strong>Tavily Search</strong><span>Primary web enrichment</span></div>
+      </div>
+      <div class="item">
+        <div class="item-icon bg-amber">🔎</div>
+        <div class="item-text"><strong>Serper Search</strong><span>Fallback web enrichment</span></div>
+      </div>
+      <div class="item">
+        <div class="item-icon bg-emerald">📧</div>
+        <div class="item-text"><strong>Gmail SMTP</strong><span>TLS · Port 587</span></div>
+      </div>
+    </div>
+
   </div>
 </div>
 
-<!-- ═══════════════════════════
-     CANVAS 2 — GENERATE
-═══════════════════════════ -->
-<div class="canvas">
-  <div class="canvas-label">② Generate Flow — per lead, on Start Processing</div>
 
-  <div class="arch-diagram">
+<!-- ══════════════════════════════════════════════════════════
+     2. UPLOAD FLOW
+══════════════════════════════════════════════════════════ -->
+<div class="section c-sky">
+  <div class="section-label" style="--accent:#38bdf8">02 — Upload Flow &nbsp;(when user drops a file)</div>
 
-    <!-- START -->
-    <div class="terminal t-ind">▶️ User clicks Start Processing</div>
+  <div class="flow-row">
 
-    <div class="v-arrow col-ind"><div class="v-line"></div><div class="v-tip"></div></div>
+    <div class="flow-node" style="border-color:#1e3a5f">
+      <div class="flow-node-num bg-sky" style="background:#e0f2fe;color:#0284c7">1</div>
+      <div class="flow-node-icon">📂</div>
+      <div class="flow-node-name">File Drop</div>
+      <div class="flow-node-desc">CSV or Excel dragged onto upload zone</div>
+    </div>
+    <div class="flow-arrow"><div class="flow-arrow-line"></div></div>
 
-    <!-- STEP 1: Thread -->
-    <div class="proc bg-ind">
-      <div class="proc-head">
-        <span class="proc-icon">🔄</span>
-        <span class="proc-title c-ind">Background Thread Spawned</span>
-      </div>
-      <div class="proc-desc">FastAPI spawns a daemon thread per batch. Server remains responsive. Card status → <strong>Processing…</strong> broadcast via SSE.</div>
+    <div class="flow-node" style="border-color:#1e3a5f">
+      <div class="flow-node-num bg-sky" style="background:#e0f2fe;color:#0284c7">2</div>
+      <div class="flow-node-icon">🚀</div>
+      <div class="flow-node-name">POST /api/upload</div>
+      <div class="flow-node-desc">Multipart form to FastAPI</div>
+    </div>
+    <div class="flow-arrow"><div class="flow-arrow-line"></div></div>
+
+    <div class="flow-node" style="border-color:#1e3a5f">
+      <div class="flow-node-num bg-sky" style="background:#e0f2fe;color:#0284c7">3</div>
+      <div class="flow-node-icon">🔍</div>
+      <div class="flow-node-name">Parse &amp; Validate</div>
+      <div class="flow-node-desc">pandas reads rows, maps columns to Lead schema</div>
+    </div>
+    <div class="flow-arrow"><div class="flow-arrow-line"></div></div>
+
+    <div class="flow-node" style="border-color:#1e3a5f">
+      <div class="flow-node-num bg-sky" style="background:#e0f2fe;color:#0284c7">4</div>
+      <div class="flow-node-icon">🏷</div>
+      <div class="flow-node-name">Role Classification</div>
+      <div class="flow-node-desc">LLM tags each lead: C-Suite / VP / Manager…</div>
+    </div>
+    <div class="flow-arrow"><div class="flow-arrow-line"></div></div>
+
+    <div class="flow-node" style="border-color:#1e3a5f">
+      <div class="flow-node-num bg-sky" style="background:#e0f2fe;color:#0284c7">5</div>
+      <div class="flow-node-icon">💾</div>
+      <div class="flow-node-name">Store in Memory</div>
+      <div class="flow-node-desc">Leads saved, cards shown as "pending"</div>
+    </div>
+    <div class="flow-arrow"><div class="flow-arrow-line"></div></div>
+
+    <div class="flow-node" style="border-color:#1e3a5f">
+      <div class="flow-node-num bg-sky" style="background:#e0f2fe;color:#0284c7">6</div>
+      <div class="flow-node-icon">📡</div>
+      <div class="flow-node-name">SSE Broadcast</div>
+      <div class="flow-node-desc">All connected tabs receive leads_updated event</div>
     </div>
 
-    <div class="v-arrow col-amb"><div class="v-line"></div><div class="v-tip"></div></div>
+  </div>
+</div>
 
-    <!-- STEP 2: Web Research (parallel 4) -->
-    <div class="parallel-wrap">
-      <div class="parallel-label c-amb">🌐 Web Research — 4 sources in parallel</div>
-      <div class="parallel-row cols-4">
-        <div class="par-node bg-amb">
-          <span class="par-icon">🔍</span>
-          <div class="par-name c-amb">Serper</div>
-          <div class="par-hint">Google search results, site pages, hiring signals</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     3. AI PIPELINE
+══════════════════════════════════════════════════════════ -->
+<div class="section c-violet">
+  <div class="section-label" style="--accent:#8b5cf6">03 — AI Pipeline &nbsp;(per lead, on Start Processing)</div>
+
+  <div class="pipeline-wrap">
+
+    <!-- STEP 1: Trigger -->
+    <div class="pipe-step">
+      <div class="pipe-box" style="border-color:#4f46e530; max-width:520px">
+        <div class="pipe-box-icon bg-indigo">▶️</div>
+        <div class="pipe-box-body">
+          <div class="pipe-box-name">POST /api/process/start</div>
+          <div class="pipe-box-desc">User clicks "Start Processing" → FastAPI spawns a background thread per lead</div>
         </div>
-        <div class="par-node bg-amb">
-          <span class="par-icon">🤖</span>
-          <div class="par-name c-amb">Tavily AI</div>
-          <div class="par-hint">AI-curated news and company snippets</div>
-        </div>
-        <div class="par-node bg-amb">
-          <span class="par-icon">📄</span>
-          <div class="par-name c-amb">Jina AI</div>
-          <div class="par-hint">Reads actual website page content as clean text</div>
-        </div>
-        <div class="par-node bg-amb">
-          <span class="par-icon">📚</span>
-          <div class="par-name c-amb">Wikipedia</div>
-          <div class="par-hint">Company background, founding, industry context</div>
-        </div>
+        <div><span class="badge tag tag-indigo">Async</span></div>
       </div>
+      <div class="pipe-down"></div>
     </div>
 
-    <div class="v-arrow col-blu"><div class="v-line"></div><div class="v-tip"></div></div>
+    <!-- STEP 2: Web Enrichment (parallel) -->
+    <div class="pipe-step">
+      <div class="parallel-label">⚡ Parallel Web Enrichment</div>
+      <div class="parallel-grid cols-4" style="max-width:960px">
+        <div class="p-card" style="border-color:#d9770630">
+          <div class="p-card-icon">🔍</div>
+          <div class="p-card-name">Company Search</div>
+          <div class="p-card-desc">Tavily → Serper fallback · Recent news &amp; updates</div>
+        </div>
+        <div class="p-card" style="border-color:#d9770630">
+          <div class="p-card-icon">🏭</div>
+          <div class="p-card-name">Industry Research</div>
+          <div class="p-card-desc">Sector trends, competitors, market size</div>
+        </div>
+        <div class="p-card" style="border-color:#d9770630">
+          <div class="p-card-icon">👤</div>
+          <div class="p-card-name">Lead Intel</div>
+          <div class="p-card-desc">Role context, responsibilities, pain points</div>
+        </div>
+        <div class="p-card" style="border-color:#d9770630">
+          <div class="p-card-icon">🌐</div>
+          <div class="p-card-name">Website Scan</div>
+          <div class="p-card-desc">Product offering, messaging, tech stack</div>
+        </div>
+      </div>
+      <div class="pipe-down"></div>
+    </div>
 
     <!-- STEP 3: RAG -->
-    <div class="proc bg-blu">
-      <div class="proc-head">
-        <span class="proc-icon">🔍</span>
-        <span class="proc-title c-blu">RAG — ChromaDB Knowledge Retrieval</span>
+    <div class="pipe-step">
+      <div class="pipe-box" style="border-color:#7c3aed30">
+        <div class="pipe-box-icon bg-violet">🧬</div>
+        <div class="pipe-box-body">
+          <div class="pipe-box-name">RAG Retrieval — ChromaDB</div>
+          <div class="pipe-box-desc">Embeds the lead context and queries the knowledge base for relevant internal documents</div>
+          <div class="pipe-box-tags">
+            <span class="tag tag-violet">BGE Embeddings</span>
+            <span class="tag tag-violet">Cosine Similarity</span>
+            <span class="tag tag-violet">EphemeralClient</span>
+          </div>
+        </div>
       </div>
-      <div class="proc-desc">Semantic search across two vector collections using BAAI/bge embeddings. Returns industry pain points and matched solutions as context for the LLM.</div>
-      <div class="pills">
-        <div class="pill pill-blu">Industry pain points KB</div>
-        <div class="pill pill-blu">Solutions library</div>
-        <div class="pill pill-blu">bge-large-en embeddings</div>
-      </div>
+      <div class="pipe-down"></div>
     </div>
 
-    <div class="v-arrow col-grn"><div class="v-line"></div><div class="v-tip"></div></div>
-
-    <!-- STEP 4: AI Analysis (parallel 3) -->
-    <div class="parallel-wrap">
-      <div class="parallel-label c-grn">🧠 AI Analysis — LangGraph · Meta-Llama 3.1 · 3 sequential LLM calls</div>
-      <div class="parallel-row cols-3">
-        <div class="par-node bg-grn">
-          <span class="par-icon">① 🏢</span>
-          <div class="par-name c-grn">Business Analysis</div>
-          <div class="par-hint">Company profile, digital maturity, growth stage, competitive position</div>
+    <!-- STEP 4: AI Analysis (parallel) -->
+    <div class="pipe-step">
+      <div class="parallel-label">🤖 Parallel AI Analysis</div>
+      <div class="parallel-grid cols-3">
+        <div class="p-card" style="border-color:#4f46e530">
+          <div class="p-card-icon">📊</div>
+          <div class="p-card-name">Business Intelligence</div>
+          <div class="p-card-desc">Company health, growth signals, strategic priorities</div>
         </div>
-        <div class="par-node bg-grn">
-          <span class="par-icon">② 😣</span>
-          <div class="par-name c-grn">Pain Point Extraction</div>
-          <div class="par-hint">Scored JSON list of operational and strategic pain areas</div>
+        <div class="p-card" style="border-color:#4f46e530">
+          <div class="p-card-icon">🎯</div>
+          <div class="p-card-name">Opportunity Scoring</div>
+          <div class="p-card-desc">Fit score 0–100 · Priority rank · Buying signals</div>
         </div>
-        <div class="par-node bg-grn">
-          <span class="par-icon">③ 💡</span>
-          <div class="par-name c-grn">Opportunity Mapping</div>
-          <div class="par-hint">Solutions matched to pain points with urgency ratings</div>
+        <div class="p-card" style="border-color:#4f46e530">
+          <div class="p-card-icon">💡</div>
+          <div class="p-card-name">Pain Point Mapping</div>
+          <div class="p-card-desc">Role-specific challenges aligned to your offering</div>
         </div>
       </div>
+      <div class="pipe-down"></div>
     </div>
-
-    <div class="v-arrow col-vio"><div class="v-line"></div><div class="v-tip"></div></div>
 
     <!-- STEP 5: Email Generation -->
-    <div class="proc bg-vio">
-      <div class="proc-head">
-        <span class="proc-icon">✍️</span>
-        <span class="proc-title c-vio">Role-Aware Email Generation</span>
+    <div class="pipe-step">
+      <div class="pipe-box" style="border-color:#05966940">
+        <div class="pipe-box-icon bg-emerald">✍️</div>
+        <div class="pipe-box-body">
+          <div class="pipe-box-name">Email Generation — Meta-Llama 3.1</div>
+          <div class="pipe-box-desc">Writes a hyper-personalised email using web intel + RAG context + role-tier prompt templates</div>
+          <div class="pipe-box-tags">
+            <span class="tag tag-emerald">Subject line</span>
+            <span class="tag tag-emerald">Opening hook</span>
+            <span class="tag tag-emerald">Value proposition</span>
+            <span class="tag tag-emerald">CTA</span>
+          </div>
+        </div>
       </div>
-      <div class="proc-desc">Prompt engineered for the recipient's seniority. LLM writes subject line + full email body using all gathered research and analysis.</div>
-      <div class="pills">
-        <div class="pill pill-vio">👔 C-Suite → ROI &amp; strategy</div>
-        <div class="pill pill-vio">💻 Technical → integration</div>
-        <div class="pill pill-vio">👥 HR → people outcomes</div>
-        <div class="pill pill-vio">📈 Sales → pipeline impact</div>
-      </div>
+      <div class="pipe-down"></div>
     </div>
-
-    <div class="v-arrow col-amb"><div class="v-line"></div><div class="v-tip"></div></div>
 
     <!-- STEP 6: QA Judge -->
-    <div class="proc bg-amb">
-      <div class="proc-head">
-        <span class="proc-icon">⚖️</span>
-        <span class="proc-title c-amb">LLM Quality Judge</span>
-      </div>
-      <div class="proc-desc">Second LLM call scores the email on personalisation, specificity, and tone. If score is below threshold → auto-rewrite and re-score. Only emails that pass QA proceed.</div>
-    </div>
-
-    <div class="v-arrow col-pnk"><div class="v-line"></div><div class="v-tip"></div></div>
-
-    <!-- STEP 7: Decision diamond -->
-    <div class="diamond-wrap">
-      <div class="diamond">
-        <div class="diamond-text">SMTP<br>configured?</div>
-      </div>
-    </div>
-
-    <!-- Fork branches -->
-    <div class="fork-row" style="max-width:700px;width:100%">
-
-      <!-- YES branch (left) -->
-      <div class="fork-branch-col">
-        <div class="fork-h-line" style="background:rgba(16,185,129,0.4);margin-right:-1px"></div>
-        <div style="display:flex;flex-direction:column;align-items:center">
-          <div class="fork-v-down" style="background:rgba(16,185,129,0.4)"></div>
-          <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:9px solid rgba(16,185,129,0.45)"></div>
-        </div>
-        <div class="fork-label c-grn">YES</div>
-        <div class="fork-card bg-grn">
-          <div class="fork-card-title c-grn">📬 Email Sent</div>
-          <div class="fork-card-desc">Gmail SMTP · STARTTLS · subject parsed from content · delivery confirmed</div>
+    <div class="pipe-step">
+      <div class="pipe-box" style="border-color:#d9770640">
+        <div class="pipe-box-icon bg-amber">⚖️</div>
+        <div class="pipe-box-body">
+          <div class="pipe-box-name">QA Judge — LLM Review</div>
+          <div class="pipe-box-desc">Second LLM pass scores the draft on tone, personalisation, relevance &amp; clarity. Regenerates if score is too low.</div>
+          <div class="pipe-box-tags">
+            <span class="tag tag-amber">Score 0–10</span>
+            <span class="tag tag-amber">Auto-retry</span>
+          </div>
         </div>
       </div>
+      <div class="pipe-down"></div>
+    </div>
 
-      <!-- NO branch (right) -->
-      <div class="fork-branch-col">
-        <div class="fork-h-line" style="background:rgba(74,74,128,0.4);margin-left:-1px"></div>
-        <div style="display:flex;flex-direction:column;align-items:center">
-          <div class="fork-v-down" style="background:rgba(74,74,128,0.4)"></div>
-          <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:9px solid rgba(74,74,128,0.4)"></div>
+    <!-- STEP 7: Decision -->
+    <div class="pipe-step">
+      <div style="display:flex; flex-direction:column; align-items:center; gap:16px;">
+
+        <!-- Diamond -->
+        <div class="diamond">
+          <div class="diamond-inner">
+            <div class="di">🤔</div>
+            <div class="dl">QA<br/>PASS?</div>
+          </div>
         </div>
-        <div class="fork-label" style="color:#8888c0">NO</div>
-        <div class="fork-card bg-mut">
-          <div class="fork-card-title" style="color:#8888c0">💾 Saved Only</div>
-          <div class="fork-card-desc">Email saved · viewable &amp; downloadable from card</div>
+
+        <!-- YES branch -->
+        <div class="branch-yes" style="width:100%; max-width:480px; text-align:center;">
+          <div class="branch-label" style="color:#16a34a">✅ Score ≥ Threshold</div>
+          <div style="color:#15803d; font-size:0.8rem; margin-bottom:4px">Email approved — sent via Gmail SMTP</div>
+          <div style="color:#64748b; font-size:0.72rem">TLS · Port 587 · FROM_NAME header</div>
+        </div>
+
+      </div>
+      <div class="pipe-down"></div>
+    </div>
+
+    <!-- STEP 8: SSE Update -->
+    <div class="pipe-step">
+      <div class="pipe-box" style="border-color:#38bdf830; max-width:520px">
+        <div class="pipe-box-icon bg-sky">📡</div>
+        <div class="pipe-box-body">
+          <div class="pipe-box-name">SSE card_update broadcast</div>
+          <div class="pipe-box-desc">All browser tabs receive status: "done" or "error" · Card turns green / red in real time</div>
         </div>
       </div>
-
     </div>
 
-    <div class="v-arrow col-grn"><div class="v-line"></div><div class="v-tip"></div></div>
-
-    <!-- STEP 8: SSE update -->
-    <div class="proc bg-grn">
-      <div class="proc-head">
-        <span class="proc-icon">⚡</span>
-        <span class="proc-title c-grn">SSE card_update Event → Real-time UI</span>
-      </div>
-      <div class="proc-desc">Backend pushes event over live SSE connection. Card in the dashboard flips instantly.</div>
-      <div class="pills">
-        <div class="pill pill-grn">Done badge</div>
-        <div class="pill pill-grn">Sent badge</div>
-        <div class="pill pill-grn">Email Content active</div>
-        <div class="pill pill-grn">Copy / Download</div>
-      </div>
-    </div>
-
-    <div class="v-arrow col-grn"><div class="v-line"></div><div class="v-tip"></div></div>
-
-    <!-- END -->
-    <div class="terminal" style="background:rgba(16,185,129,0.12);border-color:rgba(16,185,129,0.5);color:#34d399">
-      ✅ Lead Processed
-    </div>
-
-  </div><!-- /arch-diagram -->
-
-  <div class="legend">
-    <div class="leg"><div class="leg-dot" style="background:#6366f1"></div>FastAPI / Threading</div>
-    <div class="leg"><div class="leg-dot" style="background:#f59e0b"></div>External APIs</div>
-    <div class="leg"><div class="leg-dot" style="background:#3b82f6"></div>ChromaDB / RAG</div>
-    <div class="leg"><div class="leg-dot" style="background:#10b981"></div>LangGraph / LLM</div>
-    <div class="leg"><div class="leg-dot" style="background:#8b5cf6"></div>Email Generation</div>
-    <div class="leg"><div class="leg-dot" style="background:#ec4899"></div>SMTP Decision</div>
-    <div class="leg"><div class="leg-dot" style="background:#10b981"></div>SSE Real-time</div>
   </div>
+</div>
 
+
+<!-- ══════════════════════════════════════════════════════════
+     4. TECH STACK LEGEND
+══════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-label">04 — Tech Stack</div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#38bdf8"></div>Next.js 14 · React 18 · TypeScript</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#6366f1"></div>FastAPI · Uvicorn · Python 3.11</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#8b5cf6"></div>LangGraph · LangChain</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#a78bfa"></div>ChromaDB (in-memory) · BGE Embeddings</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>Meta-Llama 3.1 via DeepInfra</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>Tavily + Serper search APIs</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div>Gmail SMTP · TLS</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#64748b"></div>Material UI v6 · Emotion CSS</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#64748b"></div>Render.com · Single service deploy</div>
+  </div>
 </div>
 
 </body>
