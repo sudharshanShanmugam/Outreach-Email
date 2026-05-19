@@ -211,12 +211,25 @@ def _process_all(leads: list):
             )
 
             email_sent = False
+            subject_line, body_text = "", content or ""
             if lead.get("email") and content:
                 from services.email_sender import send_email, extract_subject, is_configured
+                subject_line, body_text = extract_subject(content)
                 if is_configured():
-                    subject, body = extract_subject(content)
-                    ok, _err = send_email(lead["email"], subject, body)
+                    ok, _err = send_email(lead["email"], subject_line, body_text)
                     email_sent = ok
+
+            if content:
+                from store import record_email
+                record_email(
+                    lead_id=lid,
+                    company=lead.get("company", ""),
+                    name=lead.get("name", ""),
+                    email_address=lead.get("email", ""),
+                    subject=subject_line,
+                    body=body_text,
+                    sent=email_sent,
+                )
 
             with _state_lock:
                 _card_states[lid] = {
@@ -243,6 +256,26 @@ def _process_all(leads: list):
     with _state_lock:
         _processing = False
     _broadcast_sync({"type": "complete"})
+
+
+# ── Email history ────────────────────────────────────────────────────────────
+@app.get("/api/history")
+async def get_history():
+    from store import get_email_history
+    return {"history": get_email_history()}
+
+
+@app.get("/api/history/stats")
+async def get_history_stats():
+    from store import get_history_stats
+    return {"stats": get_history_stats()}
+
+
+@app.delete("/api/history")
+async def clear_history():
+    from store import clear_email_history
+    clear_email_history()
+    return {"status": "cleared"}
 
 
 # ── SSE stream ────────────────────────────────────────────────────────────────

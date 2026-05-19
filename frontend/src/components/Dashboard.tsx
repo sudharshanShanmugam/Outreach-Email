@@ -11,6 +11,14 @@ import InputAdornment from '@mui/material/InputAdornment'
 import Chip from '@mui/material/Chip'
 import LinearProgress from '@mui/material/LinearProgress'
 import Divider from '@mui/material/Divider'
+import Dialog from '@mui/material/Dialog'
+import DialogTitle from '@mui/material/DialogTitle'
+import DialogContent from '@mui/material/DialogContent'
+import DialogActions from '@mui/material/DialogActions'
+import List from '@mui/material/List'
+import ListItem from '@mui/material/ListItem'
+import ListItemText from '@mui/material/ListItemText'
+import IconButton from '@mui/material/IconButton'
 
 import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
@@ -23,9 +31,14 @@ import DoneAllRoundedIcon from '@mui/icons-material/DoneAllRounded'
 import SendOutlinedIcon from '@mui/icons-material/SendOutlined'
 import TuneRoundedIcon from '@mui/icons-material/TuneRounded'
 import InboxOutlinedIcon from '@mui/icons-material/InboxOutlined'
+import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded'
+import AutorenewIcon from '@mui/icons-material/Autorenew'
 
 import { Lead, CardStates } from '../types'
 import LeadCard from './LeadCard'
+
+// ── Duplicate lead type ───────────────────────────────────────────────────────
+interface DupeLead { id: string; company: string; name: string; email: string; lastSent: string }
 
 // ── Animations ────────────────────────────────────────────────────────────────
 const shimmer = keyframes`
@@ -63,6 +76,51 @@ export default function Dashboard({
   const fileRef = useRef<HTMLInputElement>(null)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<FilterTab>('all')
+  const [dupeLeads, setDupeLeads] = useState<DupeLead[]>([])
+  const [dupeDialog, setDupeDialog] = useState(false)
+
+  const handleStartClick = async () => {
+    // Check each lead's email against history
+    const res = await fetch('/api/history').then(r => r.json()).catch(() => ({ history: [] }))
+    const history: { email_address: string; company: string; sent_at: string }[] = res.history ?? []
+
+    // Build map: email → most recent sent_at
+    const historyMap = new Map<string, string>()
+    for (const h of history) {
+      if (h.email_address && !historyMap.has(h.email_address)) {
+        historyMap.set(h.email_address.toLowerCase(), h.sent_at)
+      }
+    }
+
+    const dupes: DupeLead[] = leads
+      .filter(l => l.email && historyMap.has(l.email.toLowerCase()))
+      .map(l => ({
+        id: l.id,
+        company: l.company ?? '',
+        name: l.name ?? '',
+        email: l.email ?? '',
+        lastSent: historyMap.get(l.email!.toLowerCase())!,
+      }))
+
+    if (dupes.length > 0) {
+      setDupeLeads(dupes)
+      setDupeDialog(true)
+    } else {
+      onStart()
+    }
+  }
+
+  const handleRegenerateAll = () => {
+    setDupeDialog(false)
+    onStart()
+  }
+
+  const handleRemoveDupes = async () => {
+    setDupeDialog(false)
+    for (const d of dupeLeads) onRemoveLead(d.id)
+    // Start with remaining leads after removal
+    onStart()
+  }
 
   const total    = leads.length
   const allDone  = !processing && doneCount >= total && total > 0
@@ -163,7 +221,7 @@ export default function Dashboard({
               <Button
                 variant="contained"
                 startIcon={<PlayArrowRoundedIcon />}
-                onClick={onStart}
+                onClick={handleStartClick}
                 disabled={!total || processing}
                 sx={{
                   px: 2.5, py: 0.85, fontSize: '0.83rem', borderRadius: '10px',
@@ -368,6 +426,98 @@ export default function Dashboard({
           ))}
         </Box>
       )}
+
+      {/* ── Duplicate email dialog ── */}
+      <Dialog open={dupeDialog} onClose={() => setDupeDialog(false)} maxWidth="sm" fullWidth
+        PaperProps={{ sx: { borderRadius: '16px', backgroundImage: 'none' } }}>
+        <DialogTitle sx={{ pb: 1 }}>
+          <Stack direction="row" alignItems="center" gap={1.5}>
+            <Box sx={{
+              width: 38, height: 38, borderRadius: '10px',
+              bgcolor: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}>
+              <WarningAmberRoundedIcon sx={{ fontSize: 20, color: '#f59e0b' }} />
+            </Box>
+            <Box>
+              <Typography variant="subtitle1" fontWeight={800}>Duplicate Emails Detected</Typography>
+              <Typography variant="caption" color="text.secondary">
+                {dupeLeads.length} lead{dupeLeads.length > 1 ? 's have' : ' has'} already been emailed before.
+              </Typography>
+            </Box>
+          </Stack>
+        </DialogTitle>
+        <Divider />
+        <DialogContent sx={{ pt: 1.5, pb: 1 }}>
+          <List dense disablePadding>
+            {dupeLeads.map((d) => (
+              <ListItem key={d.id} disablePadding
+                secondaryAction={
+                  <Tooltip title="Remove this lead">
+                    <IconButton size="small"
+                      onClick={() => {
+                        onRemoveLead(d.id)
+                        const remaining = dupeLeads.filter(x => x.id !== d.id)
+                        setDupeLeads(remaining)
+                        if (remaining.length === 0) setDupeDialog(false)
+                      }}
+                      sx={{
+                        color: 'text.disabled',
+                        '&:hover': { color: 'error.main', bgcolor: 'rgba(239,68,68,0.08)' },
+                      }}>
+                      <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Tooltip>
+                }
+                sx={{
+                  py: 0.8, px: 1.5, pr: 5,
+                  borderRadius: '10px', mb: 0.5,
+                  bgcolor: isDark ? 'rgba(245,158,11,0.06)' : 'rgba(245,158,11,0.05)',
+                  border: '1px solid rgba(245,158,11,0.15)',
+                }}>
+                <ListItemText
+                  primary={
+                    <Stack direction="row" alignItems="center" gap={1}>
+                      <Typography variant="body2" fontWeight={700}>{d.company}</Typography>
+                      {d.name && <Typography variant="caption" color="text.secondary">· {d.name}</Typography>}
+                    </Stack>
+                  }
+                  secondary={
+                    <Stack direction="row" alignItems="center" gap={1} mt={0.2}>
+                      <Typography variant="caption" color="text.disabled">{d.email}</Typography>
+                      <Typography variant="caption" color="text.disabled">·</Typography>
+                      <Typography variant="caption" sx={{ color: '#f59e0b' }}>
+                        Last sent {new Date(d.lastSent).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </Typography>
+                    </Stack>
+                  }
+                />
+              </ListItem>
+            ))}
+          </List>
+        </DialogContent>
+        <Divider />
+        <DialogActions sx={{ px: 2.5, py: 2, gap: 1 }}>
+          <Button size="small" variant="outlined" color="error"
+            startIcon={<DeleteOutlineIcon />}
+            onClick={handleRemoveDupes}
+            sx={{ borderRadius: '9px', borderColor: 'rgba(239,68,68,0.4)' }}>
+            Remove &amp; Skip
+          </Button>
+          <Box sx={{ flexGrow: 1 }} />
+          <Button size="small" variant="outlined"
+            onClick={() => setDupeDialog(false)}
+            sx={{ borderRadius: '9px' }}>
+            Cancel
+          </Button>
+          <Button size="small" variant="contained"
+            startIcon={<AutorenewIcon sx={{ fontSize: 16 }} />}
+            onClick={handleRegenerateAll}
+            sx={{ borderRadius: '9px', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)' }}>
+            Regenerate Anyway
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }

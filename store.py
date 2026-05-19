@@ -1,13 +1,16 @@
 import uuid, os, json, threading
+from datetime import datetime, timezone
 
 _leads: dict = {}
 _analyses: dict = {}
 _outreach: dict = {}
 _kb_docs: dict = {}
 _scores: dict = {}
+_email_history: list = []
 
 _lock = threading.Lock()
-_DATA_FILE = os.path.join(os.path.dirname(__file__), "data", "leads.json")
+_DATA_FILE    = os.path.join(os.path.dirname(__file__), "data", "leads.json")
+_HISTORY_FILE = os.path.join(os.path.dirname(__file__), "data", "email_history.json")
 
 
 def _save_leads():
@@ -29,8 +32,79 @@ def _load_leads():
         pass
 
 
+def _save_history():
+    try:
+        os.makedirs(os.path.dirname(_HISTORY_FILE), exist_ok=True)
+        with open(_HISTORY_FILE, "w") as f:
+            json.dump(_email_history, f)
+    except Exception:
+        pass
+
+
+def _load_history():
+    try:
+        if os.path.isfile(_HISTORY_FILE):
+            with open(_HISTORY_FILE) as f:
+                _email_history.extend(json.load(f))
+    except Exception:
+        pass
+
+
 def init_db():
     _load_leads()
+    _load_history()
+
+
+def record_email(
+    lead_id: str,
+    company: str,
+    name: str,
+    email_address: str,
+    subject: str,
+    body: str,
+    sent: bool,
+) -> dict:
+    now = datetime.now(timezone.utc)
+    entry = {
+        "id":            str(uuid.uuid4()),
+        "lead_id":       lead_id,
+        "company":       company,
+        "name":          name,
+        "email_address": email_address,
+        "subject":       subject,
+        "body":          body,
+        "sent":          sent,
+        "sent_at":       now.isoformat(),
+        "date":          now.strftime("%Y-%m-%d"),
+        "time":          now.strftime("%H:%M:%S"),
+    }
+    with _lock:
+        _email_history.append(entry)
+        _save_history()
+    return entry
+
+
+def get_email_history() -> list[dict]:
+    return list(reversed(_email_history))
+
+
+def clear_email_history():
+    with _lock:
+        _email_history.clear()
+        _save_history()
+
+
+def get_history_stats() -> list[dict]:
+    """Return per-date counts sorted newest first."""
+    by_date: dict[str, dict] = {}
+    for e in _email_history:
+        d = e["date"]
+        if d not in by_date:
+            by_date[d] = {"date": d, "total": 0, "sent": 0}
+        by_date[d]["total"] += 1
+        if e["sent"]:
+            by_date[d]["sent"] += 1
+    return sorted(by_date.values(), key=lambda x: x["date"], reverse=True)
 
 
 def upsert_lead(lead: dict) -> str:
