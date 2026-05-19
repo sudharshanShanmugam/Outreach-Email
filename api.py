@@ -59,15 +59,36 @@ def _broadcast_sync(event: dict):
 
 
 # ── Startup ───────────────────────────────────────────────────────────────────
+def _load_env():
+    env_path = os.path.join(os.path.dirname(__file__), ".env")
+    if not os.path.isfile(env_path):
+        return
+    with open(env_path) as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, val = line.partition("=")
+            key = key.strip()
+            val = val.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = val
+
+
 @app.on_event("startup")
 async def on_startup():
     global _main_loop
     _main_loop = asyncio.get_event_loop()
-    from store import init_db, clear_all_data
+    _load_env()
+    from store import init_db, get_all_leads
     from services.chroma_manager import clear_all_collections
     from services.kb_ingestion import seed_trident_kb
     init_db()
-    clear_all_data()
+    with _state_lock:
+        for lead in get_all_leads():
+            lid = lead["id"]
+            if lid not in _card_states:
+                _card_states[lid] = {"status": "pending", "email": None, "sent": False, "error": None}
     clear_all_collections()
     seed_trident_kb()
 

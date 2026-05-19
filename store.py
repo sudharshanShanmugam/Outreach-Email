@@ -1,19 +1,42 @@
-import uuid
+import uuid, os, json, threading
 
-# All data lives in memory and is cleared on app restart
 _leads: dict = {}
-_analyses: dict = {}      # (lead_id, analysis_type) -> content
-_outreach: dict = {}      # lead_id -> list[dict]
-_kb_docs: dict = {}       # doc_id -> dict
-_scores: dict = {}        # lead_id -> dict
+_analyses: dict = {}
+_outreach: dict = {}
+_kb_docs: dict = {}
+_scores: dict = {}
+
+_lock = threading.Lock()
+_DATA_FILE = os.path.join(os.path.dirname(__file__), "data", "leads.json")
+
+
+def _save_leads():
+    try:
+        os.makedirs(os.path.dirname(_DATA_FILE), exist_ok=True)
+        with open(_DATA_FILE, "w") as f:
+            json.dump(list(_leads.values()), f)
+    except Exception:
+        pass
+
+
+def _load_leads():
+    try:
+        if os.path.isfile(_DATA_FILE):
+            with open(_DATA_FILE) as f:
+                for lead in json.load(f):
+                    _leads[lead["id"]] = lead
+    except Exception:
+        pass
 
 
 def init_db():
-    pass
+    _load_leads()
 
 
 def upsert_lead(lead: dict) -> str:
-    _leads[lead["id"]] = lead
+    with _lock:
+        _leads[lead["id"]] = lead
+        _save_leads()
     return lead["id"]
 
 
@@ -26,11 +49,13 @@ def get_lead(lead_id: str) -> dict | None:
 
 
 def delete_lead(lead_id: str):
-    _leads.pop(lead_id, None)
-    for key in [k for k in _analyses if k[0] == lead_id]:
-        del _analyses[key]
-    _outreach.pop(lead_id, None)
-    _scores.pop(lead_id, None)
+    with _lock:
+        _leads.pop(lead_id, None)
+        for key in [k for k in _analyses if k[0] == lead_id]:
+            del _analyses[key]
+        _outreach.pop(lead_id, None)
+        _scores.pop(lead_id, None)
+        _save_leads()
 
 
 def save_analysis(lead_id: str, analysis_type: str, content: str, model: str = None) -> str:
@@ -77,19 +102,23 @@ def get_kb_documents() -> list[dict]:
 
 
 def clear_all_leads():
-    _leads.clear()
-    for key in list(_analyses.keys()):
-        del _analyses[key]
-    _outreach.clear()
-    _scores.clear()
+    with _lock:
+        _leads.clear()
+        for key in list(_analyses.keys()):
+            del _analyses[key]
+        _outreach.clear()
+        _scores.clear()
+        _save_leads()
 
 
 def clear_all_data():
-    _leads.clear()
-    _analyses.clear()
-    _outreach.clear()
-    _kb_docs.clear()
-    _scores.clear()
+    with _lock:
+        _leads.clear()
+        _analyses.clear()
+        _outreach.clear()
+        _kb_docs.clear()
+        _scores.clear()
+        _save_leads()
 
 
 def get_dashboard_stats() -> dict:
